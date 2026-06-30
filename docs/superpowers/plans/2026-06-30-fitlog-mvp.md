@@ -16,7 +16,9 @@
 - localStorage key is exactly `fitlog:v1`.
 - Day keys are `YYYY-MM-DD` based on **local** date.
 - Mobile-first; installable PWA (manifest + service worker); offline-capable.
-- Automated tests run in-browser via `tests.html` and cover **pure logic only**; UI is verified by manual checklist.
+- Automated tests cover **pure logic only** (`js/storage.js` and `js/logic.js`). The same test files run two ways: headlessly via `sh tests/run.sh` (JavaScriptCore — prints `RESULT: N passed, M failed` and exits non-zero on any failure) and visually in the browser via `tests.html`. UI screens are verified by a manual checklist.
+- For Tasks 2–5, run the suite with `sh tests/run.sh`. Wherever a step says to "refresh `tests.html`" and expect "N passed", the headless equivalent is: run `sh tests/run.sh` and confirm `RESULT: N passed, 0 failed` (exit 0). A subagent without a browser must use the headless runner.
+- `jsc` lives at `/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc` (present on macOS). The `tests/` dir is dev-only and never cached by the service worker, so it does not ship to the PWA.
 - Commit after every task with a clear message.
 
 ---
@@ -35,9 +37,12 @@
 │   ├── logic.js            # pure functions: dates, calcs, queries, state mutations
 │   ├── render.js           # DOM render functions per screen + el() helper
 │   └── app.js              # bootstrap: state, handlers, tab nav, SW registration
-├── tests.html              # in-browser test runner
+├── tests.html              # in-browser test runner (browser view of the suite)
 ├── tests/
-│   ├── test-framework.js   # tiny test/assert + results renderer
+│   ├── test-framework.js   # tiny test/assert + results renderer + summary()
+│   ├── jsc-prelude.js      # polyfills structuredClone for headless jsc runs
+│   ├── jsc-report.js       # prints RESULT line from summary() under jsc
+│   ├── run.sh              # headless runner: jsc over existing *.test.js
 │   ├── storage.test.js
 │   └── logic.test.js
 ├── tools/
@@ -52,6 +57,9 @@
 **Files:**
 - Create: `index.html`
 - Create: `tests/test-framework.js`
+- Create: `tests/jsc-prelude.js`
+- Create: `tests/jsc-report.js`
+- Create: `tests/run.sh`
 - Create: `tests/sample.test.js`
 - Create: `tests.html`
 
@@ -61,7 +69,9 @@
   - `test(name, fn)` — registers a test (runs `fn`, records pass/fail).
   - `assert(cond, msg)` — throws `Error(msg)` if `cond` is falsy.
   - `assertEqual(actual, expected, msg)` — throws if `JSON.stringify` differs.
-  - `renderResults(root)` — appends a pass/fail list + summary to `root`.
+  - `summary()` — returns `{ passed, failed, failures: [{name, error}] }` from recorded results.
+  - `renderResults(root)` — appends a pass/fail list + summary to `root` (browser view).
+  - `sh tests/run.sh` — headless runner; prints `RESULT: N passed, M failed` and exits non-zero on failure.
 
 - [ ] **Step 1: Create the minimal app shell** (`index.html`)
 
@@ -102,6 +112,11 @@ export function assertEqual(actual, expected, msg) {
   const a = JSON.stringify(actual);
   const e = JSON.stringify(expected);
   if (a !== e) throw new Error((msg ? msg + ': ' : '') + `expected ${e}, got ${a}`);
+}
+
+export function summary() {
+  const passed = results.filter(r => r.pass).length;
+  return { passed, failed: results.length - passed, failures: results.filter(r => !r.pass) };
 }
 
 export function renderResults(root) {
@@ -154,30 +169,75 @@ test('harness detects failures', () => {
 </html>
 ```
 
-- [ ] **Step 5: Start the dev server and verify the harness shows RED**
+- [ ] **Step 5: Create the jsc structuredClone polyfill** (`tests/jsc-prelude.js`)
 
-Run (leave running in a background terminal):
-```bash
-cd ~/Projects/fitlog && python3 -m http.server 8000
+```js
+// JavaScriptCore (jsc) has no structuredClone, which js/logic.js relies on.
+// A JSON round-trip is a correct deep clone here because app state is pure JSON
+// (no Dates, functions, or cycles). Browsers use their native structuredClone.
+globalThis.structuredClone = globalThis.structuredClone || ((x) => JSON.parse(JSON.stringify(x)));
 ```
-Open `http://localhost:8000/tests.html`.
-Expected: summary reads **"0 passed, 1 failed"** and a red `FAIL harness detects failures — expected 3, got 2` row. This proves the harness catches failures.
 
-- [ ] **Step 6: Fix the sample test to GREEN**
+- [ ] **Step 6: Create the jsc reporter** (`tests/jsc-report.js`)
+
+```js
+import { summary } from './test-framework.js';
+
+const s = summary();
+for (const f of s.failures) print('FAIL ' + f.name + (f.error ? ' — ' + f.error : ''));
+print('RESULT: ' + s.passed + ' passed, ' + s.failed + ' failed');
+```
+
+- [ ] **Step 7: Create the headless runner** (`tests/run.sh`)
+
+```sh
+#!/bin/sh
+# Headless test runner (macOS JavaScriptCore). Runs every tests/*.test.js through
+# the shared framework and prints "RESULT: N passed, M failed". Exits non-zero on
+# any failure, or if a jsc/syntax error suppresses the RESULT line.
+JSC="/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+cd "$(dirname "$0")"
+files=""
+for f in *.test.js; do
+  [ -e "$f" ] && files="$files $f"
+done
+out=$("$JSC" -m jsc-prelude.js $files jsc-report.js 2>&1)
+echo "$out"
+echo "$out" | grep -qE 'RESULT: [0-9]+ passed, 0 failed'
+```
+
+- [ ] **Step 8: Run the suite headlessly and verify RED**
+
+Run:
+```bash
+cd ~/Projects/fitlog && sh tests/run.sh ; echo "exit=$?"
+```
+Expected: prints `FAIL harness detects failures — expected 3, got 2`, then `RESULT: 0 passed, 1 failed`, and `exit=1`. This proves the runner catches failures.
+
+- [ ] **Step 9: Fix the sample test to GREEN**
 
 Edit `tests/sample.test.js`, change `assertEqual(1 + 1, 3);` to:
 ```js
   assertEqual(1 + 1, 2);
 ```
-Refresh `http://localhost:8000/tests.html`.
-Expected: **"1 passed, 0 failed"**, green row. Harness works in both directions.
+Re-run:
+```bash
+cd ~/Projects/fitlog && sh tests/run.sh ; echo "exit=$?"
+```
+Expected: `RESULT: 1 passed, 0 failed` and `exit=0`.
 
-- [ ] **Step 7: Commit**
+Also confirm the browser view works for the user: start the dev server (leave it running in a background terminal) and open the page:
+```bash
+cd ~/Projects/fitlog && python3 -m http.server 8000
+```
+Open `http://localhost:8000/tests.html` → green `PASS harness detects failures` and `1 passed, 0 failed`.
+
+- [ ] **Step 10: Commit**
 
 ```bash
 cd ~/Projects/fitlog
 git add index.html tests.html tests/
-git commit -m "chore: scaffold app shell and in-browser test harness"
+git commit -m "chore: scaffold app shell and headless + browser test harness"
 ```
 
 ---
