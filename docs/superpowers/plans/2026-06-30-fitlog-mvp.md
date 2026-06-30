@@ -354,7 +354,7 @@ export function parseState(json) {
   let obj;
   try {
     obj = JSON.parse(json);
-  } catch (e) {
+  } catch {
     return d;
   }
   if (!obj || typeof obj !== 'object') return d;
@@ -365,7 +365,8 @@ export function parseState(json) {
       goals: { ...d.settings.goals, ...goals },
       vitamins: Array.isArray(vitamins) ? vitamins : d.settings.vitamins
     },
-    days: (obj.days && typeof obj.days === 'object') ? obj.days : {}
+    // typeof [] === 'object', so guard against arrays too (e.g. imported {"days":[…]}).
+    days: (obj.days && typeof obj.days === 'object' && !Array.isArray(obj.days)) ? obj.days : {}
   };
 }
 

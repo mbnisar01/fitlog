@@ -43,3 +43,11 @@ test('loadState on empty store returns defaults', () => {
   const store = { getItem: () => null, setItem: () => {} };
   assertEqual(loadState(store), makeDefaultState());
 });
+
+test('parseState resets a non-object (array) days to {}', () => {
+  assertEqual(parseState('{"days":[1,2,3]}').days, {});
+});
+
+test('parseState resets present-but-wrong-type vitamins to default', () => {
+  assertEqual(parseState('{"settings":{"vitamins":"none"}}').settings.vitamins, []);
+});
