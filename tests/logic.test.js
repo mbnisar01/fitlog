@@ -1,7 +1,7 @@
 import { test, assert, assertEqual } from './test-framework.js';
 import { makeDefaultState } from '../js/storage.js';
 import {
-  todayKey, formatDateKey, stepDay, emptyDay, getDay, hasData, goalPercent, daySummary, listDays
+  todayKey, formatDateKey, stepDay, emptyDay, getDay, hasData, goalPercent, daySummary, listDays, genId, setMacros, addWorkout, deleteWorkout, toggleVitamin, setGoals, addVitamin, removeVitamin
 } from '../js/logic.js';
 
 test('todayKey formats a local date as YYYY-MM-DD', () => {
@@ -90,4 +90,61 @@ test('listDays returns only days with data, newest first', () => {
   state.days['2026-06-29'] = emptyDay(); // no data → excluded
   state.days['2026-06-30'] = { macros: { calories: 0, protein: 0, carbs: 0, fat: 0 }, workouts: [{ id: 'w_1', name: 'Run', duration: 5, notes: '' }], vitamins: {} };
   assertEqual(listDays(state), ['2026-06-30', '2026-06-28']);
+});
+
+test('genId returns unique w_-prefixed ids', () => {
+  const a = genId();
+  const b = genId();
+  assert(a.startsWith('w_'), 'should start with w_');
+  assert(a !== b, 'ids should differ');
+});
+
+test('setMacros stores numeric values without mutating input', () => {
+  const state = makeDefaultState();
+  const next = setMacros(state, '2026-06-30', { calories: '1850', protein: 140, carbs: 180, fat: 55 });
+  assertEqual(next.days['2026-06-30'].macros, { calories: 1850, protein: 140, carbs: 180, fat: 55 });
+  assertEqual(state.days, {}); // original untouched
+});
+
+test('addWorkout appends an entry with an id and coerced duration', () => {
+  const state = makeDefaultState();
+  const next = addWorkout(state, '2026-06-30', { name: 'Push day', duration: '45', notes: 'felt strong' });
+  const workouts = next.days['2026-06-30'].workouts;
+  assertEqual(workouts.length, 1);
+  assertEqual(workouts[0].name, 'Push day');
+  assertEqual(workouts[0].duration, 45);
+  assertEqual(workouts[0].notes, 'felt strong');
+  assert(workouts[0].id.startsWith('w_'));
+  assertEqual(state.days, {}); // original untouched
+});
+
+test('deleteWorkout removes the matching workout', () => {
+  let state = addWorkout(makeDefaultState(), '2026-06-30', { name: 'Run', duration: 20, notes: '' });
+  const id = state.days['2026-06-30'].workouts[0].id;
+  const next = deleteWorkout(state, '2026-06-30', id);
+  assertEqual(next.days['2026-06-30'].workouts, []);
+});
+
+test('toggleVitamin flips taken state', () => {
+  const on = toggleVitamin(makeDefaultState(), '2026-06-30', 'Vitamin D');
+  assertEqual(on.days['2026-06-30'].vitamins['Vitamin D'], true);
+  const off = toggleVitamin(on, '2026-06-30', 'Vitamin D');
+  assertEqual(off.days['2026-06-30'].vitamins['Vitamin D'], false);
+});
+
+test('setGoals replaces goals with numeric values', () => {
+  const next = setGoals(makeDefaultState(), { calories: '2200', protein: '170', carbs: '210', fat: '70' });
+  assertEqual(next.settings.goals, { calories: 2200, protein: 170, carbs: 210, fat: 70 });
+});
+
+test('addVitamin appends unique trimmed names', () => {
+  let state = addVitamin(makeDefaultState(), '  Omega-3  ');
+  state = addVitamin(state, 'Omega-3'); // duplicate ignored
+  assertEqual(state.settings.vitamins, ['Omega-3']);
+});
+
+test('removeVitamin removes a name from the list', () => {
+  let state = addVitamin(makeDefaultState(), 'Magnesium');
+  state = removeVitamin(state, 'Magnesium');
+  assertEqual(state.settings.vitamins, []);
 });

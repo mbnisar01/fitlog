@@ -65,3 +65,80 @@ export function listDays(state) {
     .sort()
     .reverse();
 }
+
+function num(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+// Clone state and ensure days[key] exists as a fresh day object.
+function withDay(state, key) {
+  const next = structuredClone(state);
+  if (!next.days) next.days = {};
+  if (!next.days[key]) next.days[key] = emptyDay();
+  return next;
+}
+
+export function genId() {
+  return 'w_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+export function setMacros(state, key, macros) {
+  const next = withDay(state, key);
+  next.days[key].macros = {
+    calories: num(macros.calories),
+    protein: num(macros.protein),
+    carbs: num(macros.carbs),
+    fat: num(macros.fat)
+  };
+  return next;
+}
+
+export function addWorkout(state, key, { name, duration, notes }) {
+  const next = withDay(state, key);
+  next.days[key].workouts.push({
+    id: genId(),
+    name: String(name || '').trim(),
+    duration: num(duration),
+    notes: String(notes || '')
+  });
+  return next;
+}
+
+export function deleteWorkout(state, key, id) {
+  const next = withDay(state, key);
+  next.days[key].workouts = next.days[key].workouts.filter(w => w.id !== id);
+  return next;
+}
+
+export function toggleVitamin(state, key, name) {
+  const next = withDay(state, key);
+  next.days[key].vitamins[name] = !next.days[key].vitamins[name];
+  return next;
+}
+
+export function setGoals(state, goals) {
+  const next = structuredClone(state);
+  next.settings.goals = {
+    calories: num(goals.calories),
+    protein: num(goals.protein),
+    carbs: num(goals.carbs),
+    fat: num(goals.fat)
+  };
+  return next;
+}
+
+export function addVitamin(state, name) {
+  const trimmed = String(name || '').trim();
+  const next = structuredClone(state);
+  if (trimmed && !next.settings.vitamins.includes(trimmed)) {
+    next.settings.vitamins.push(trimmed);
+  }
+  return next;
+}
+
+export function removeVitamin(state, name) {
+  const next = structuredClone(state);
+  next.settings.vitamins = next.settings.vitamins.filter(v => v !== name);
+  return next;
+}
