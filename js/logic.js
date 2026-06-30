@@ -40,3 +40,28 @@ export function hasData(day) {
   if ((day.workouts || []).length > 0) return true;
   return Object.values(day.vitamins || {}).some(v => v === true);
 }
+
+export function goalPercent(value, goal) {
+  if (!goal || goal <= 0) return 0;
+  return Math.round((value / goal) * 100);
+}
+
+export function daySummary(state, key) {
+  const day = getDay(state, key);
+  const vitaminNames = (state.settings && state.settings.vitamins) || [];
+  const taken = vitaminNames.filter(name => day.vitamins && day.vitamins[name] === true).length;
+  return {
+    calories: (day.macros && day.macros.calories) || 0,
+    workoutCount: (day.workouts || []).length,
+    vitaminsTaken: taken,
+    vitaminsTotal: vitaminNames.length
+  };
+}
+
+export function listDays(state) {
+  const days = state.days || {};
+  return Object.keys(days)
+    .filter(key => hasData(days[key]))
+    .sort()
+    .reverse();
+}

@@ -1,7 +1,7 @@
 import { test, assert, assertEqual } from './test-framework.js';
 import { makeDefaultState } from '../js/storage.js';
 import {
-  todayKey, formatDateKey, stepDay, emptyDay, getDay, hasData
+  todayKey, formatDateKey, stepDay, emptyDay, getDay, hasData, goalPercent, daySummary, listDays
 } from '../js/logic.js';
 
 test('todayKey formats a local date as YYYY-MM-DD', () => {
@@ -57,4 +57,37 @@ test('hasData is true when a workout exists', () => {
 test('hasData is true when a vitamin is taken', () => {
   const d = emptyDay(); d.vitamins['Vitamin D'] = true;
   assert(hasData(d) === true);
+});
+
+test('goalPercent computes a rounded percentage', () => {
+  assertEqual(goalPercent(100, 200), 50);
+});
+
+test('goalPercent is 0 when the goal is 0', () => {
+  assertEqual(goalPercent(5, 0), 0);
+});
+
+test('goalPercent can exceed 100', () => {
+  assertEqual(goalPercent(250, 200), 125);
+});
+
+test('daySummary counts calories, workouts, and vitamins taken', () => {
+  const state = makeDefaultState();
+  state.settings.vitamins = ['A', 'B', 'C'];
+  state.days['2026-06-30'] = {
+    macros: { calories: 1850, protein: 0, carbs: 0, fat: 0 },
+    workouts: [{ id: 'w_1', name: 'Run', duration: 20, notes: '' }],
+    vitamins: { A: true, B: false }
+  };
+  assertEqual(daySummary(state, '2026-06-30'), {
+    calories: 1850, workoutCount: 1, vitaminsTaken: 1, vitaminsTotal: 3
+  });
+});
+
+test('listDays returns only days with data, newest first', () => {
+  const state = makeDefaultState();
+  state.days['2026-06-28'] = { macros: { calories: 100, protein: 0, carbs: 0, fat: 0 }, workouts: [], vitamins: {} };
+  state.days['2026-06-29'] = emptyDay(); // no data → excluded
+  state.days['2026-06-30'] = { macros: { calories: 0, protein: 0, carbs: 0, fat: 0 }, workouts: [{ id: 'w_1', name: 'Run', duration: 5, notes: '' }], vitamins: {} };
+  assertEqual(listDays(state), ['2026-06-30', '2026-06-28']);
 });
