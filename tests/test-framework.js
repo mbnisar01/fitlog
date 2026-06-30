@@ -25,12 +25,11 @@ export function summary() {
 }
 
 export function renderResults(root) {
-  const passed = results.filter(r => r.pass).length;
-  const failed = results.length - passed;
-  const summary = document.createElement('h2');
-  summary.textContent = `${passed} passed, ${failed} failed`;
-  summary.style.color = failed ? '#c0392b' : '#27ae60';
-  root.append(summary);
+  const { passed, failed } = summary();
+  const summaryEl = document.createElement('h2');
+  summaryEl.textContent = `${passed} passed, ${failed} failed`;
+  summaryEl.style.color = failed ? '#c0392b' : '#27ae60';
+  root.append(summaryEl);
   const ul = document.createElement('ul');
   for (const r of results) {
     const li = document.createElement('li');
