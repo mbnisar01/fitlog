@@ -3,7 +3,7 @@ import {
   todayKey, stepDay,
   setMacros, addWorkout, deleteWorkout, toggleVitamin
 } from './logic.js';
-import { renderToday } from './render.js';
+import { renderToday, renderHistory } from './render.js';
 
 let state = loadState();
 let selectedKey = todayKey();
@@ -24,13 +24,16 @@ const handlers = {
   onMacros(key, macros) { commit(setMacros(state, key, macros)); },
   onAddWorkout(key, workout) { commit(addWorkout(state, key, workout)); },
   onDeleteWorkout(key, id) { commit(deleteWorkout(state, key, id)); },
-  onToggleVitamin(key, name) { commit(toggleVitamin(state, key, name)); }
+  onToggleVitamin(key, name) { commit(toggleVitamin(state, key, name)); },
+  onOpenDay(key) { selectedKey = key; currentTab = 'today'; render(); }
 };
 
 function render() {
   screen.innerHTML = '';
   if (currentTab === 'today') {
     screen.append(renderToday(state, selectedKey, handlers));
+  } else if (currentTab === 'history') {
+    screen.append(renderHistory(state, handlers));
   }
   for (const btn of tabs.querySelectorAll('button')) {
     btn.classList.toggle('active', btn.dataset.tab === currentTab);

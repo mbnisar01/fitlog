@@ -1,5 +1,5 @@
 import {
-  formatDateKey, getDay, goalPercent
+  formatDateKey, getDay, goalPercent, listDays, daySummary
 } from './logic.js';
 
 export function el(tag, props = {}, ...children) {
@@ -136,5 +136,28 @@ export function renderToday(state, selectedKey, handlers) {
     macrosCard(state, selectedKey, handlers),
     workoutsCard(state, selectedKey, handlers),
     vitaminsCard(state, selectedKey, handlers)
+  );
+}
+
+export function renderHistory(state, handlers) {
+  const keys = listDays(state);
+  if (!keys.length) {
+    return el('section', { class: 'card' },
+      el('h2', {}, 'History'),
+      el('p', { class: 'empty' }, 'No days logged yet. Add macros, a workout, or a vitamin on the Today tab.')
+    );
+  }
+  return el('div', {},
+    ...keys.map(key => {
+      const s = daySummary(state, key);
+      return el('section', { class: 'card summary-day', onClick: () => handlers.onOpenDay(key) },
+        el('div', { style: 'font-weight:600' }, formatDateKey(key)),
+        el('div', { class: 'meta' },
+          el('span', {}, `${s.calories} kcal`),
+          el('span', {}, `${s.workoutCount} workout${s.workoutCount === 1 ? '' : 's'}`),
+          el('span', {}, `${s.vitaminsTaken}/${s.vitaminsTotal} vitamins`)
+        )
+      );
+    })
   );
 }
