@@ -161,3 +161,58 @@ export function renderHistory(state, handlers) {
     })
   );
 }
+
+export function renderSettings(state, handlers) {
+  const g = state.settings.goals;
+  const gi = {};
+  const goalField = (name, label) => {
+    const input = el('input', { type: 'number', inputmode: 'numeric', value: g[name], min: '0' });
+    gi[name] = input;
+    return el('div', {}, el('label', {}, label), input);
+  };
+
+  const newVit = el('input', { type: 'text', placeholder: 'e.g. Vitamin D' });
+
+  const vitaminList = state.settings.vitamins.length
+    ? state.settings.vitamins.map(name => el('div', { class: 'list-item' },
+        el('span', {}, name),
+        el('button', { class: 'btn danger', onClick: () => handlers.onRemoveVitamin(name) }, 'Remove')
+      ))
+    : [el('p', { class: 'empty' }, 'No vitamins yet.')];
+
+  const importInput = el('input', {
+    type: 'file', accept: 'application/json,.json',
+    onChange: (e) => { if (e.target.files[0]) handlers.onImport(e.target.files[0]); }
+  });
+
+  return el('div', {},
+    el('section', { class: 'card' },
+      el('h2', {}, 'Daily goals'),
+      el('div', { class: 'row' }, goalField('calories', 'Calories'), goalField('protein', 'Protein')),
+      el('div', { class: 'row' }, goalField('carbs', 'Carbs'), goalField('fat', 'Fat')),
+      el('button', {
+        class: 'btn', style: 'margin-top:12px; width:100%',
+        onClick: () => handlers.onSetGoals({
+          calories: gi.calories.value, protein: gi.protein.value, carbs: gi.carbs.value, fat: gi.fat.value
+        })
+      }, 'Save goals')
+    ),
+    el('section', { class: 'card' },
+      el('h2', {}, 'Vitamins'),
+      ...vitaminList,
+      el('div', { class: 'row', style: 'margin-top:12px' },
+        newVit,
+        el('button', {
+          class: 'btn', style: 'flex:0 0 auto',
+          onClick: () => { if (newVit.value.trim()) handlers.onAddVitamin(newVit.value); }
+        }, 'Add')
+      )
+    ),
+    el('section', { class: 'card' },
+      el('h2', {}, 'Backup'),
+      el('button', { class: 'btn secondary', style: 'width:100%; margin-bottom:10px', onClick: handlers.onExport }, 'Export data (JSON)'),
+      el('label', {}, 'Import data (replaces everything)'),
+      importInput
+    )
+  );
+}
